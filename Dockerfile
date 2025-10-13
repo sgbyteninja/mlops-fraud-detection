@@ -8,7 +8,7 @@ RUN pip install --no-cache-dir -r requirements.txt \
     && pip install boto3 mlflow pandas scikit-learn joblib requests watchdog
 
 #Copy the training data
-COPY dataset/months ./dataset/months
+#COPY dataset/months ./dataset/months
 
 # Copy scripts
 COPY app.py .
