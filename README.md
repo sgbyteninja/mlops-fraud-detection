@@ -1,6 +1,20 @@
 # Fraud Detection MLOps Project
 
-## Architecture
+This project implements a full MLOps workflow for a **fraud detection system**. It combines automated data ingestion, drift monitoring, retraining, experiment tracking, and API deployment in a **containerized environment** (Docker on EC2). MLflow is used for local experiment tracking and S3 is used as the model and metrics storage.
+
+## Project Overview
+
+The system is designed to:
+
+- Automatically ingest **monthly CSV data** from S3.
+- Monitor the data for **drift** and trigger retraining if needed.
+- Train a **RandomForest classifier** with hyperparameters optimized for performance.
+- Serve predictions via a **Flask API**.
+- Track experiments, models, and metrics using **MLflow**.
+- Backup models and metrics to **AWS S3**.
+- Be fully containerized for **reproducibility and portability**.
+
+This setup demonstrates a realistic production-like MLOps pipeline suitable for hands-on experimentation and deployment.
 
 ## Architecture
 
