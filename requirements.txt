@@ -1,0 +1,9 @@
+Flask
+boto3
+pandas
+scikit-learn
+joblib
+mlflow
+watchdog
+python-dotenv
+requests

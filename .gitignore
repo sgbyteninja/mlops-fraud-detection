@@ -1,0 +1,65 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# Environment / Secrets
+.env
+.env.*         
+!.env.example
+*.key
+*.pem
+
+# Virtual environment
+venv/
+env/
+.venv/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Logs / MLflow
+*.log
+logs/
+mlflow/
+mlruns/
+*.sqlite3
+
+# Docker
+*.dockerignore
+docker-compose.override.yml
+docker-compose.local.yml
+*.tar
+*.img
+
+# Pictures
+*.png
+!Flowchart.png
+
+# MacOS
+.DS_Store
+
+# VSCode / IDE
+.vscode/
+.idea/
+*.iml
+
+# Data
+*.csv
+*.pkl
+*.joblib
+
+# Backup / temporary files
+*.bak
+*.swp
+*.tmp
+
+# Files / temporary
+exporting
+extracting
+naming
+resolve
+transferring
+sha*
