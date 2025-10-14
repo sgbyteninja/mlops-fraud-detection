@@ -44,7 +44,7 @@ This setup demonstrates a realistic production-like MLOps pipeline suitable for 
    docker build -t fraud-detectio-mlops:latest .
 
 4. Run the container  
-   docker run -it --rm --env-file .env -p 8000:8000 -p 5001:5000 -v "$(pwd)/mlruns:/app/mlruns" fraud-detectio-mlops:latest
+   docker run -it --rm --env-file .env -p 8000:8000 -p 5001:5001 -v "$(pwd)/mlruns:/app/mlruns" fraud-detectio-mlops:latest
 
 **Explanation:**  
 - Port 8000: Flask API endpoints  
