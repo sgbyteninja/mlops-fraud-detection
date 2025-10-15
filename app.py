@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify
+from functools import wraps
 import pandas as pd
 import logging
 import joblib
@@ -17,9 +18,10 @@ AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
 AWS_DEFAULT_REGION = os.getenv("AWS_DEFAULT_REGION", "eu-central-1")
 BUCKET_NAME = os.getenv("BUCKET_NAME", "fraud-detection-project-data-science")
 MODEL_BACKUPS_PREFIX = os.getenv("MODEL_BACKUPS_PREFIX", "model_backups")
-MODEL_RELOAD_INTERVAL = int(os.getenv("MODEL_RELOAD_INTERVAL", 300)) 
+MODEL_RELOAD_INTERVAL = int(os.getenv("MODEL_RELOAD_INTERVAL", 300))
+API_TOKEN = os.getenv("API_TOKEN")  # 🔒 Token aus .env
 
-# lask App
+# Flask App
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
 
@@ -31,7 +33,17 @@ s3_client = boto3.client(
     region_name=AWS_DEFAULT_REGION
 )
 
-# Global model
+# Auth Decorator
+def require_api_token(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        token = request.headers.get("Authorization")
+        if not token or token.replace("Bearer ", "") != API_TOKEN:
+            return jsonify({"error": "Unauthorized"}), 401
+        return f(*args, **kwargs)
+    return decorated
+
+# Model Handling
 model = None
 latest_model_key = None
 lock = threading.Lock()
@@ -72,13 +84,15 @@ def reload_model_periodically():
 thread = threading.Thread(target=reload_model_periodically, daemon=True)
 thread.start()
 
-# Health Check Endpoint
+# Routes
+# Health Check (offen)
 @app.route("/health")
 def health():
     return jsonify({"status": "ok"})
 
-# Prediction Endpoint
+# Prediction (geschützt)
 @app.route("/predict", methods=["POST"])
+@require_api_token
 def predict():
     try:
         data = request.get_json().get("data")
@@ -92,8 +106,8 @@ def predict():
         logging.exception("Prediction error")
         return jsonify({"error": str(e)}), 400
 
+# Main
 if __name__ == "__main__":
-    # Load initial model
     try:
         latest_model_key = get_latest_model_key()
         model = load_model_from_s3(latest_model_key)
