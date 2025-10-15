@@ -4,6 +4,7 @@ import boto3
 import os
 from dotenv import load_dotenv
 from config import BUCKET_NAME, MONTHS_PREFIX
+from scipy.stats import ttest_ind
 
 # Load environment variables
 load_dotenv()
@@ -29,15 +30,14 @@ def load_latest_month():
     df = pd.read_csv(BytesIO(s3_client.get_object(Bucket=BUCKET_NAME, Key=latest)['Body'].read()))
     return df
 
-def check_drift(reference_df, latest_df):
-    """Check for simple drift based on 10% mean difference."""
+def check_drift(reference_df, latest_df, alpha=0.05):
+    """Check for drift using t-test per feature."""
     drifted_features = []
     for col in reference_df.columns:
         if col not in latest_df.columns:
             continue
-        ref_mean = reference_df[col].mean()
-        latest_mean = latest_df[col].mean()
-        if abs(latest_mean - ref_mean) > 0.1 * abs(ref_mean):
+        t_stat, p_value = ttest_ind(reference_df[col], latest_df[col], equal_var=False)
+        if p_value < alpha:
             drifted_features.append(col)
     return drifted_features
 
@@ -48,6 +48,7 @@ if __name__ == "__main__":
         resp = s3_client.list_objects_v2(Bucket=BUCKET_NAME, Prefix=MONTHS_PREFIX)
         first_key = sorted([obj['Key'] for obj in resp.get('Contents', []) if obj['Key'].endswith('.csv')])[0]
         df_ref = pd.read_csv(BytesIO(s3_client.get_object(Bucket=BUCKET_NAME, Key=first_key)['Body'].read()))
+        
         drift_features = check_drift(df_ref, df_latest)
         print("Drift detected in features:", drift_features)
     else:
