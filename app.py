@@ -85,12 +85,12 @@ thread = threading.Thread(target=reload_model_periodically, daemon=True)
 thread.start()
 
 # Routes
-# Health Check (offen)
+# Health Check
 @app.route("/health")
 def health():
     return jsonify({"status": "ok"})
 
-# Prediction (geschützt)
+# Prediction
 @app.route("/predict", methods=["POST"])
 @require_api_token
 def predict():
