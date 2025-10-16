@@ -6,9 +6,9 @@ This project implements a full MLOps workflow for a **fraud detection system**. 
 
 The system is designed to:
 
-- Automatically ingest **monthly CSV data** from S3.
+- Automatically ingest **weekly CSV data** from S3.
 - Monitor the data for **drift** and trigger retraining if needed.
-- Train a **RandomForest classifier** with hyperparameters optimized for performance.
+- Train a **RandomForest classifier** using the last 4 weeks of data.
 - Serve predictions via a **Flask API**.
 - Track experiments, models, and metrics using **MLflow**.
 - Backup models and metrics to **AWS S3**.
@@ -35,7 +35,7 @@ This setup demonstrates a realistic production-like MLOps pipeline suitable for 
    AWS_DEFAULT_REGION=eu-north-1  
    MLFLOW_TRACKING_URI=file:./mlruns  
    BUCKET_NAME=fraud-detection-project-data-science-2025  
-   MONTHS_PREFIX=monthly_csv/  
+   MONTHS_PREFIX=weekly_data/  
    LATEST_MODEL_PATH=./model/model.pkl  
 
    *Replace `YOUR_AWS_ACCESS_KEY_ID` and `YOUR_AWS_SECRET_ACCESS_KEY` with your real AWS credentials.*
@@ -58,7 +58,21 @@ This setup demonstrates a realistic production-like MLOps pipeline suitable for 
 - GET `/health` → Check API health  
 
 Example:  
-curl -X POST http://localhost:8000/predict -H "Content-Type: application/json" -d '{"features": [0.1, 0.2, ...]}'
+curl -X POST http://localhost:8000/predict \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <YOUR_API_TOKEN>" \
+  -d '{
+    "data": [
+      {
+        "Time": 1000,
+        "V1": 0.1,
+        "V2": 0.2,
+        "V3": 0.3,
+        "...": "...",
+        "Amount": 123.45
+      }
+    ]
+  }'
 
 **MLflow UI**  
 - Open http://localhost:5001 in your browser  
@@ -67,7 +81,9 @@ curl -X POST http://localhost:8000/predict -H "Content-Type: application/json" -
 
 ## Notes
 
-- The Drift Watchdog automatically monitors S3 for new monthly CSV files.  
+- The Drift Watchdog automatically monitors S3 for new weekly CSV files. 
+- All incoming API requests are collected locally** in a CSV log and uploaded once per week** to S3. 
+- Retraining uses the last 4 weeks of data for model updates. 
 - If drift is detected, the retraining pipeline runs and logs metrics to MLflow.  
 - Models and metrics are backed up to S3 after each retraining.  
 - Ensure your AWS credentials are valid and the specified S3 bucket exists.  

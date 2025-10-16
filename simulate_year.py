@@ -1,7 +1,7 @@
 import boto3
 import time
-from dotenv import load_dotenv
 import os
+from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
@@ -9,7 +9,7 @@ AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
 AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
 AWS_DEFAULT_REGION = os.getenv("AWS_DEFAULT_REGION", "eu-central-1")
 BUCKET_NAME = os.getenv("BUCKET_NAME")
-MONTHS_PREFIX = os.getenv("MONTHS_PREFIX", "dataset/months")
+WEEKS_PREFIX = os.getenv("WEEKS_PREFIX", "weekly_data")
 
 # S3 client
 s3_client = boto3.client(
@@ -19,20 +19,23 @@ s3_client = boto3.client(
     region_name=AWS_DEFAULT_REGION
 )
 
-def upload_month_file(local_file, month_number):
-    """Upload a month CSV to S3."""
-    s3_key = f"{MONTHS_PREFIX}/creditcard_month{month_number}.csv"
+def upload_week_file(local_file, week_number):
+    """Upload a week's CSV to S3."""
+    s3_key = f"{WEEKS_PREFIX}/week_{week_number}.csv"
     s3_client.upload_file(local_file, BUCKET_NAME, s3_key)
     print(f"Uploaded {local_file} → s3://{BUCKET_NAME}/{s3_key}")
 
-# Simulation
-NUM_MONTHS = 12
-for month in range(1, NUM_MONTHS + 1):
-    local_file = f"dataset/months/creditcard_month{month}.csv"
+# Simulation of weekly uploads
+NUM_WEEKS = 52
+DATA_FOLDER = "dataset/weeks"
+
+for week in range(1, NUM_WEEKS + 1):
+    local_file = os.path.join(DATA_FOLDER, f"week_{week}.csv")
     if os.path.exists(local_file):
-        upload_month_file(local_file, month)
-        time.sleep(420) #to make sure, drift_watchdog has enough time for retraining
+        upload_week_file(local_file, week)
+        # wait some time for drift_watchdog to pick it up (for testing)
+        time.sleep(60)  # 60s for demo; in real test could be longer
     else:
         print(f"File not found: {local_file}")
 
-print("\n--- Year Simulation Completed ---")
+print("\n--- Yearly Weekly Data Simulation Completed ---")

@@ -1,17 +1,13 @@
-# S3 settings
-BUCKET_NAME = "fraud-detection-project-data-science-2025"  
-MONTHS_PREFIX = "dataset/months/"  
+BUCKET_NAME = "fraud-detection-project-data-science-2025"
+WEEKS_PREFIX = "weekly_data/"
 
-# Paths for local MLflow tracking and model storage
-MLFLOW_TRACKING_URI = "file:./mlruns"  # Local MLflow directory
-LATEST_MODEL_PATH = "./mlruns/latest_model/model.pkl"  # Local path for latest model
+MLFLOW_TRACKING_URI = "file:./mlruns"
+LATEST_MODEL_PATH = "./models/latest_model/model.pkl"
 
-# Drift-check interval (in seconds)
-CHECK_INTERVAL = 300  
+CHECK_INTERVAL = 150
 
-# S3 model backup settings
-ENABLE_S3_MODEL_BACKUP = True  
-S3_MODEL_PATH = "models/latest_model/model.pkl" 
+NUM_WEEKS_FOR_TRAINING = 12
 
-# Prefix for model version backups on S3 
-S3_MODEL_BACKUP_PREFIX = "model_backups"  # Folder for timestamped model backups
+ENABLE_S3_MODEL_BACKUP = True
+S3_MODEL_PATH = "models/latest_model/model.pkl"
+S3_MODEL_BACKUP_PREFIX = "model_backups"

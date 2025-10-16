@@ -3,7 +3,7 @@ from io import BytesIO
 import boto3
 import os
 from dotenv import load_dotenv
-from config import BUCKET_NAME, MONTHS_PREFIX
+from config import BUCKET_NAME, WEEKS_PREFIX
 from scipy.stats import ttest_ind
 
 # Load environment variables
@@ -20,36 +20,64 @@ s3_client = boto3.client(
     region_name=AWS_DEFAULT_REGION
 )
 
-def load_latest_month():
-    """Load the latest CSV month from S3."""
-    resp = s3_client.list_objects_v2(Bucket=BUCKET_NAME, Prefix=MONTHS_PREFIX)
-    files = sorted([obj['Key'] for obj in resp.get('Contents', []) if obj['Key'].endswith('.csv')])
-    if not files:
-        return None
-    latest = files[-1]
-    df = pd.read_csv(BytesIO(s3_client.get_object(Bucket=BUCKET_NAME, Key=latest)['Body'].read()))
-    return df
+def load_latest_weeks(n_weeks=3):
+    """Load the latest week as new data, and previous n_weeks as reference."""
+    resp = s3_client.list_objects_v2(Bucket=BUCKET_NAME, Prefix=WEEKS_PREFIX)
+    files = sorted([obj["Key"] for obj in resp.get("Contents", []) if obj["Key"].endswith(".csv")])
+    if len(files) < n_weeks + 1:
+        print(f"Not enough data: need {n_weeks+1} weeks, found {len(files)}")
+        return None, None
+
+    # Newest week
+    latest_key = files[-1]
+    latest_obj = s3_client.get_object(Bucket=BUCKET_NAME, Key=latest_key)
+    df_latest = pd.read_csv(BytesIO(latest_obj["Body"].read()))
+
+    # Reference: previous n_weeks
+    ref_keys = files[-(n_weeks+1):-1]
+    df_ref_list = []
+    for key in ref_keys:
+        obj = s3_client.get_object(Bucket=BUCKET_NAME, Key=key)
+        df_ref_list.append(pd.read_csv(BytesIO(obj["Body"].read())))
+    df_ref = pd.concat(df_ref_list, ignore_index=True)
+
+    return df_ref, df_latest
 
 def check_drift(reference_df, latest_df, alpha=0.05):
-    """Check for drift using t-test per feature."""
+    """Check for drift using t-tests per numeric feature with Bonferroni correction."""
     drifted_features = []
-    for col in reference_df.columns:
+    numeric_cols = [c for c in reference_df.columns if pd.api.types.is_numeric_dtype(reference_df[c])]
+
+    n_tests = len(numeric_cols)
+    if n_tests == 0:
+        print("No numeric features found to test.")
+        return []
+
+    alpha_adj = alpha / n_tests
+    print(f"Performing {n_tests} t-tests with Bonferroni correction (α={alpha}, adjusted α={alpha_adj:.6f})")
+
+    for col in numeric_cols:
         if col not in latest_df.columns:
             continue
-        t_stat, p_value = ttest_ind(reference_df[col], latest_df[col], equal_var=False)
-        if p_value < alpha:
-            drifted_features.append(col)
+        ref_col = reference_df[col].dropna()
+        new_col = latest_df[col].dropna()
+        if len(ref_col) < 2 or len(new_col) < 2:
+            continue
+        try:
+            t_stat, p_value = ttest_ind(ref_col, new_col, equal_var=False)
+            if p_value < alpha_adj:
+                drifted_features.append(col)
+        except Exception as e:
+            print(f"Skipping {col} due to error: {e}")
     return drifted_features
 
 if __name__ == "__main__":
-    df_latest = load_latest_month()
-    if df_latest is not None:
-        # Use the first month as reference
-        resp = s3_client.list_objects_v2(Bucket=BUCKET_NAME, Prefix=MONTHS_PREFIX)
-        first_key = sorted([obj['Key'] for obj in resp.get('Contents', []) if obj['Key'].endswith('.csv')])[0]
-        df_ref = pd.read_csv(BytesIO(s3_client.get_object(Bucket=BUCKET_NAME, Key=first_key)['Body'].read()))
-        
-        drift_features = check_drift(df_ref, df_latest)
-        print("Drift detected in features:", drift_features)
+    df_ref, df_latest = load_latest_weeks(n_weeks=3)
+    if df_latest is not None and df_ref is not None:
+        drift_features = check_drift(df_ref, df_latest, alpha=0.05)
+        if drift_features:
+            print("Drift detected in features:", drift_features)
+        else:
+            print("No significant drift detected.")
     else:
-        print("No new data found.")
+        print("Not enough data to perform drift check.")
