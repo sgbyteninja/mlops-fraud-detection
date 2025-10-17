@@ -18,7 +18,6 @@ This setup demonstrates a realistic production-like MLOps pipeline suitable for 
 
 [Open Presentation](https://github.com/sgbyteninja/mlops-fraud-detection/raw/main/Power_Point_presentation.pdf)
 
-
 ## Architecture
 
 ![Architecture Diagram](Flowchart.png)
