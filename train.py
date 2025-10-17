@@ -5,14 +5,14 @@ import boto3
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
-from imblearn.over_sampling import SMOTE  # <- SMOTE für Minority Oversampling
+from imblearn.over_sampling import SMOTE
 import joblib
 import mlflow
 import mlflow.sklearn
 from dotenv import load_dotenv
 from datetime import datetime
 import json
-from config import BUCKET_NAME, WEEKS_PREFIX, LATEST_MODEL_PATH, NUM_WEEKS_FOR_TRAINING
+from config import BUCKET_NAME, LATEST_MODEL_PATH
 
 # Load environment variables
 load_dotenv()
@@ -30,15 +30,12 @@ EXPERIMENT_NAME = "fraud_detection"
 mlflow.set_experiment(EXPERIMENT_NAME)
 
 # Helper functions
-def load_last_weeks():
-    """Load last N weeks of data from S3."""
-    resp = s3_client.list_objects_v2(Bucket=BUCKET_NAME, Prefix=WEEKS_PREFIX)
-    files = sorted([obj['Key'] for obj in resp.get("Contents", []) if obj['Key'].endswith(".csv")])
-    if not files:
-        return pd.DataFrame()
-    files_to_load = files[-NUM_WEEKS_FOR_TRAINING:]
-    dfs = [pd.read_csv(BytesIO(s3_client.get_object(Bucket=BUCKET_NAME, Key=key)['Body'].read())) for key in files_to_load]
-    return pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
+def load_full_dataset():
+    """Load the complete dataset from S3."""
+    key = "dataset/creditcard.csv"
+    obj = s3_client.get_object(Bucket=BUCKET_NAME, Key=key)
+    df = pd.read_csv(BytesIO(obj['Body'].read()))
+    return df
 
 def save_model_to_s3(model_file, metrics_file=None, input_example_file=None):
     """Upload model, metrics, and input example to S3."""
@@ -51,11 +48,11 @@ def save_model_to_s3(model_file, metrics_file=None, input_example_file=None):
 
 # Main training function
 def main(use_smote=True):
-    df = load_last_weeks()
+    df = load_full_dataset()
     if df.empty:
-        print(f"No data available in the last {NUM_WEEKS_FOR_TRAINING} weeks. Exiting.")
+        print("No data available. Exiting.")
         return
-    print(f"Data loaded from last {NUM_WEEKS_FOR_TRAINING} weeks: {df.shape}")
+    print(f"Data loaded: {df.shape}")
 
     # Features & target
     X = df.drop("Class", axis=1)
@@ -82,7 +79,7 @@ def main(use_smote=True):
         bootstrap=True,
         n_jobs=-1,
         random_state=42,
-        class_weight="balanced"  # Handle class imbalance
+        class_weight="balanced"
     )
 
     with mlflow.start_run(run_name="train_local"):
