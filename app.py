@@ -10,7 +10,6 @@ from dotenv import load_dotenv
 import threading
 import time
 from datetime import datetime
-import calendar
 
 # Load environment variables
 load_dotenv()
@@ -50,7 +49,7 @@ model = None
 latest_model_key = None
 lock = threading.Lock()
 
-# MODEL HANDLING
+# Model handling
 def get_latest_model_key():
     resp = s3_client.list_objects_v2(Bucket=BUCKET_NAME, Prefix=MODEL_BACKUPS_PREFIX)
     keys = [obj['Key'] for obj in resp.get('Contents', []) if obj['Key'].endswith("model.pkl")]
@@ -79,19 +78,20 @@ def reload_model_periodically():
             logging.error(f"Error loading model: {e}")
         time.sleep(MODEL_RELOAD_INTERVAL)
 
-# REQUEST LOGGING
+# Request logging
 REQUEST_LOG_PATH = "requests_log.csv"
 
-def log_request_to_csv(data, predictions):
-    """Append incoming requests + predictions to local CSV."""
+def log_request_to_csv(df, preds_proba, threshold=0.5):
+    """Append incoming requests + predicted class to local CSV."""
     try:
-        df = pd.DataFrame(data)
-        df["prediction"] = predictions
-        df["timestamp"] = datetime.utcnow()
+        df_to_log = df.copy()
+        # Nur Class-Spalte anhängen
+        df_to_log["Class"] = (preds_proba >= threshold).astype(int)
+
         if os.path.exists(REQUEST_LOG_PATH):
-            df.to_csv(REQUEST_LOG_PATH, mode="a", header=False, index=False)
+            df_to_log.to_csv(REQUEST_LOG_PATH, mode="a", header=False, index=False)
         else:
-            df.to_csv(REQUEST_LOG_PATH, mode="w", header=True, index=False)
+            df_to_log.to_csv(REQUEST_LOG_PATH, mode="w", header=True, index=False)
     except Exception as e:
         logging.error(f"Error logging request: {e}")
 
@@ -116,11 +116,11 @@ def upload_weekly_data():
         # Sleep for one week (604800 seconds)
         time.sleep(7 * 24 * 60 * 60)
 
-# BACKGROUND THREADS
+# Background Threads
 threading.Thread(target=reload_model_periodically, daemon=True).start()
 threading.Thread(target=upload_weekly_data, daemon=True).start()
 
-# ROUTES
+# Routes
 @app.route("/health")
 def health():
     return jsonify({"status": "ok"})
@@ -135,12 +135,16 @@ def predict():
 
         df = pd.DataFrame(data)
         with lock:
-            preds = model.predict_proba(df)[:, 1]
+            preds_proba = model.predict_proba(df)[:, 1]
 
-        # Log requests & predictions
-        log_request_to_csv(data, preds.tolist())
+        # Log requests inkl. Class
+        log_request_to_csv(df, preds_proba, threshold=0.5)
 
-        return jsonify({"predictions": preds.tolist()})
+        # API-Output als "Fraud" / "No Fraud"
+        predicted_class = (preds_proba >= 0.5).astype(int)
+        predicted_label = ["Fraud" if c == 1 else "No Fraud" for c in predicted_class]
+
+        return jsonify({"class": predicted_label})
 
     except Exception as e:
         logging.exception("Prediction error")

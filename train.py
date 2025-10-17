@@ -5,6 +5,7 @@ import boto3
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+from imblearn.over_sampling import SMOTE  # <- SMOTE für Minority Oversampling
 import joblib
 import mlflow
 import mlflow.sklearn
@@ -16,6 +17,7 @@ from config import BUCKET_NAME, WEEKS_PREFIX, LATEST_MODEL_PATH, NUM_WEEKS_FOR_T
 # Load environment variables
 load_dotenv()
 
+# S3 client setup
 s3_client = boto3.client(
     "s3",
     aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
@@ -23,10 +25,13 @@ s3_client = boto3.client(
     region_name=os.getenv("AWS_DEFAULT_REGION", "eu-central-1")
 )
 
+# MLflow experiment
 EXPERIMENT_NAME = "fraud_detection"
 mlflow.set_experiment(EXPERIMENT_NAME)
 
+# Helper functions
 def load_last_weeks():
+    """Load last N weeks of data from S3."""
     resp = s3_client.list_objects_v2(Bucket=BUCKET_NAME, Prefix=WEEKS_PREFIX)
     files = sorted([obj['Key'] for obj in resp.get("Contents", []) if obj['Key'].endswith(".csv")])
     if not files:
@@ -36,6 +41,7 @@ def load_last_weeks():
     return pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
 
 def save_model_to_s3(model_file, metrics_file=None, input_example_file=None):
+    """Upload model, metrics, and input example to S3."""
     timestamp = datetime.utcnow().strftime("%Y-%m-%d_%H-%M")
     s3_folder = f"model_backups/{timestamp}-Model"
     for file in [model_file, metrics_file, input_example_file]:
@@ -43,47 +49,68 @@ def save_model_to_s3(model_file, metrics_file=None, input_example_file=None):
             s3_client.upload_file(file, BUCKET_NAME, f"{s3_folder}/{os.path.basename(file)}")
     print(f"Model, metrics, and input example uploaded to s3://{BUCKET_NAME}/{s3_folder}")
 
-def main():
+# Main training function
+def main(use_smote=True):
     df = load_last_weeks()
     if df.empty:
         print(f"No data available in the last {NUM_WEEKS_FOR_TRAINING} weeks. Exiting.")
         return
     print(f"Data loaded from last {NUM_WEEKS_FOR_TRAINING} weeks: {df.shape}")
 
+    # Features & target
     X = df.drop("Class", axis=1)
     y = df["Class"]
 
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    # Train/test split
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, stratify=y, random_state=42
+    )
 
+    # Optional SMOTE oversampling
+    if use_smote:
+        smote = SMOTE(random_state=42)
+        X_train, y_train = smote.fit_resample(X_train, y_train)
+        print(f"After SMOTE oversampling, training shape: {X_train.shape}")
+
+    # RandomForest with balanced class weights
     model = RandomForestClassifier(
-        n_estimators=25, max_depth=8, min_samples_split=5,
-        min_samples_leaf=3, max_features='sqrt', bootstrap=True,
-        n_jobs=-1, random_state=42
+        n_estimators=25,
+        max_depth=8,
+        min_samples_split=5,
+        min_samples_leaf=3,
+        max_features='sqrt',
+        bootstrap=True,
+        n_jobs=-1,
+        random_state=42,
+        class_weight="balanced"  # Handle class imbalance
     )
 
     with mlflow.start_run(run_name="train_local"):
+        # Train model
         model.fit(X_train, y_train)
         preds = model.predict(X_test)
 
         # Compute metrics
         acc = accuracy_score(y_test, preds)
-        prec = precision_score(y_test, preds)
-        rec = recall_score(y_test, preds)
-        f1 = f1_score(y_test, preds)
+        prec = precision_score(y_test, preds, zero_division=0)
+        rec = recall_score(y_test, preds, zero_division=0)
+        f1 = f1_score(y_test, preds, zero_division=0)
         print(f"Test Accuracy: {acc:.4f}, Precision: {prec:.4f}, Recall: {rec:.4f}, F1: {f1:.4f}")
 
-        # Log metrics
+        # Log metrics to MLflow
         mlflow.log_metric("accuracy", acc)
         mlflow.log_metric("precision", prec)
         mlflow.log_metric("recall", rec)
         mlflow.log_metric("f1_score", f1)
 
-        # Save model locally
+        # Save locally
         os.makedirs(os.path.dirname(LATEST_MODEL_PATH), exist_ok=True)
         joblib.dump(model, LATEST_MODEL_PATH)
 
+        # Log model to MLflow
         mlflow.sklearn.log_model(model, "model", input_example=X_train.head(1))
 
+        # Save metrics and input example for S3 backup
         metrics_file = "metrics.json"
         input_example_file = "input_example.csv"
         with open(metrics_file, "w") as f:
@@ -95,4 +122,4 @@ def main():
     print(f"Model saved locally at {LATEST_MODEL_PATH}, logged to MLflow, and backed up to S3.")
 
 if __name__ == "__main__":
-    main()
+    main(use_smote=True)
