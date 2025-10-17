@@ -33,8 +33,8 @@ for week in range(1, NUM_WEEKS + 1):
     local_file = os.path.join(DATA_FOLDER, f"week_{week}.csv")
     if os.path.exists(local_file):
         upload_week_file(local_file, week)
-        # wait some time for drift_watchdog to pick it up (for testing)
-        time.sleep(60)  # 60s for demo; in real test could be longer
+        # wait some time for drift_watchdog to pick it up
+        time.sleep(60)  # 60s for demo
     else:
         print(f"File not found: {local_file}")
 

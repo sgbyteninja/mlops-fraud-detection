@@ -34,7 +34,7 @@ s3_client = boto3.client(
     region_name=AWS_DEFAULT_REGION
 )
 
-# Auth Decorator
+# Authentification Decorator
 def require_api_token(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -44,7 +44,7 @@ def require_api_token(f):
         return f(*args, **kwargs)
     return decorated
 
-# Global model vars
+# Global model variables
 model = None
 latest_model_key = None
 lock = threading.Lock()
@@ -85,7 +85,7 @@ def log_request_to_csv(df, preds_proba, threshold=0.5):
     """Append incoming requests + predicted class to local CSV."""
     try:
         df_to_log = df.copy()
-        # Nur Class-Spalte anhängen
+        # add Class column to the df
         df_to_log["Class"] = (preds_proba >= threshold).astype(int)
 
         if os.path.exists(REQUEST_LOG_PATH):

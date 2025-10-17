@@ -54,7 +54,7 @@ def run_retraining(use_smote=True):
     X = df.drop("Class", axis=1)
     y = df["Class"]
 
-    # Train/test split WITHOUT random_state
+    # Train/test split
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, stratify=y
     )

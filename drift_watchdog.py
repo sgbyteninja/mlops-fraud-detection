@@ -41,7 +41,8 @@ def run_drift_check():
 def run_retraining(reason):
     """Trigger retraining when drift is detected, logs to MLflow."""
     print(f"Starting retraining due to: {reason}")
-    # MLflow setup to match train/retrain scripts
+    
+    # MLflow setup
     import mlflow
     mlflow_path = os.path.join(os.getcwd(), "mlruns")
     os.makedirs(mlflow_path, exist_ok=True)
