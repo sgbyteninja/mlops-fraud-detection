@@ -16,7 +16,8 @@ The system is designed to:
 
 This setup demonstrates a realistic production-like MLOps pipeline suitable for hands-on experimentation and deployment.
 
-Power Point Presentation: https://github.com/sgbyteninja/mlops-fraud-detection/raw/main/Power_Point_presentation.pdf
+**Power Point Presentation**: https://github.com/sgbyteninja/mlops-fraud-detection/raw/main/Power_Point_presentation.pdf
+
 ## Architecture
 
 ![Architecture Diagram](Flowchart.png)
