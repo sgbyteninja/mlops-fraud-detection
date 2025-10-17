@@ -8,7 +8,7 @@ The system is designed to:
 
 - Automatically ingest **weekly CSV data** from S3.
 - Monitor the data for **drift** and trigger retraining if needed.
-- Train a **RandomForest classifier** using the last 4 weeks of data.
+- Train a **RandomForest classifier**.
 - Serve predictions via a **Flask API**.
 - Track experiments, models, and metrics using **MLflow**.
 - Backup models and metrics to **AWS S3**.
