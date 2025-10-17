@@ -16,6 +16,8 @@ The system is designed to:
 
 This setup demonstrates a realistic production-like MLOps pipeline suitable for hands-on experimentation and deployment.
 
+[Open Presentation](Power_Point_presentation.pdf)
+
 ## Architecture
 
 ![Architecture Diagram](Flowchart.png)
